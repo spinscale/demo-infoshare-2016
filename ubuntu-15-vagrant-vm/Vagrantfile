@@ -1,0 +1,47 @@
+Vagrant.configure(2) do |config|
+  # Wily was used, because xenial created SCSI errors when indexing data... WTF?!
+  config.vm.box = "ubuntu/wily64"
+
+  # bind kibana only to localhost on host vm
+  config.vm.network "forwarded_port", guest: 5601, host: 5601, host_ip: "127.0.0.1"
+
+  # only uncomment this, after the guest utils are installed otherwise provisioning will not work
+  #config.vm.synced_folder ".", "/vagrant"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "Elastic Stack Demo VM on Ubuntu 15"
+    vb.cpus = 2
+    vb.memory = "4096"
+  end
+
+  # Install elastic stack packages
+  config.vm.provision "shell", inline: <<-SHELL
+    
+    # fix locale issues
+    echo 'export LC_ALL="en_US.UTF-8"' >> ~/.bash_profile
+    echo 'export LC_CTYPE="en_US.UTF-8"' >> ~/.bash_profile
+    echo 'export LC_ALL="en_US.UTF-8"' >> ~ubuntu/.bash_profile
+    echo 'export LC_CTYPE="en_US.UTF-8"' >> ~ubuntu/.bash_profile
+  
+    # get java8 and all the elastic packages
+    sudo curl https://packages.elasticsearch.org/GPG-KEY-elasticsearch | sudo apt-key add -
+   
+    # beats are not yet in a repo
+    sudo curl -L -O https://download.elastic.co/beats/filebeat/filebeat_5.0.0-alpha2_amd64.deb
+    sudo curl -L -O https://download.elastic.co/beats/topbeat/topbeat_5.0.0-alpha2_amd64.deb
+    sudo dpkg -i topbeat_5.0.0-alpha2_amd64.deb filebeat_5.0.0-alpha2_amd64.deb
+
+    echo "deb https://packages.elastic.co/logstash/5.0/debian stable main" | sudo tee -a /etc/apt/sources.list.d/logstash.list
+    echo "deb https://packages.elastic.co/kibana/5.0.0-alpha/debian stable main" | sudo tee -a /etc/apt/sources.list.d/kibana.list
+    echo "deb https://packages.elastic.co/elasticsearch/5.x/debian stable main" | sudo tee -a /etc/apt/sources.list.d/elasticsearch-5.x.list
+    sudo add-apt-repository ppa:webupd8team/java
+    # makes autoinstall work
+    echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | sudo /usr/bin/debconf-set-selections
+
+    sudo apt-get update
+    sudo apt-get upgrade -y
+    sudo apt-get install -y oracle-java8-installer
+    sudo apt-get install -y elasticsearch logstash kibana tmux redis-server redis-tools figlet virtualbox-guest-utils
+    sudo apt-get clean
+  SHELL
+end
